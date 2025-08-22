@@ -1,4 +1,4 @@
--- King Legacy Fruit Radar + Auto-TP + Auto Collect + GUI + Logger (Direct Run)
+-- King Legacy Fruit Radar Safe Edition
 -- By: ITSH
 
 local Players = game:GetService("Players")
@@ -10,17 +10,16 @@ local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 local Debris = game:GetService("Debris")
 
--- بيانات الفواكه
 local fruitArrows, fruitDots, fruitLog = {}, {}, {}
 local autoCollect = false
-local running = true
+local scriptActive = true
 
--- GUI رئيسي
+-- GUI
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 
 -- لوحة أوامر
 local commandFrame = Instance.new("Frame", ScreenGui)
-commandFrame.Size = UDim2.new(0, 240, 0, 220)
+commandFrame.Size = UDim2.new(0, 220, 0, 220)
 commandFrame.Position = UDim2.new(0, 10, 0, 10)
 commandFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 commandFrame.BackgroundTransparency = 0.3
@@ -28,7 +27,7 @@ commandFrame.BorderSizePixel = 2
 
 local function createButton(text, posY, callback)
     local btn = Instance.new("TextButton", commandFrame)
-    btn.Size = UDim2.new(0, 220, 0, 40)
+    btn.Size = UDim2.new(0, 200, 0, 40)
     btn.Position = UDim2.new(0, 10, 0, posY)
     btn.Text = text
     btn.TextScaled = true
@@ -40,28 +39,7 @@ local function createButton(text, posY, callback)
 end
 
 -- أزرار التحكم
-createButton("Teleport Closest Fruit (T)", 10, function()
-    local closest, dist = nil, math.huge
-    for fruit,_ in pairs(fruitArrows) do
-        if fruit and fruit.Parent then
-            local d = (LocalPlayer.Character.HumanoidRootPart.Position - fruit.Position).magnitude
-            if d < dist then
-                closest = fruit
-                dist = d
-            end
-        end
-    end
-    if closest then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(closest.Position + Vector3.new(0,5,0))
-        StarterGui:SetCore("SendNotification", {
-            Title = "Fruit TP 🍏",
-            Text = "انتقلت إلى: "..closest.Parent.Name,
-            Duration = 4
-        })
-    end
-end)
-
-createButton("Toggle Auto Collect (Y)", 60, function()
+createButton("Toggle Auto Collect (Y)", 10, function()
     autoCollect = not autoCollect
     StarterGui:SetCore("SendNotification", {
         Title = "Auto Collect",
@@ -70,17 +48,17 @@ createButton("Toggle Auto Collect (Y)", 60, function()
     })
 end)
 
-createButton("Show Fruit List (L)", 110, function()
+createButton("Show Fruit List (L)", 60, function()
     print("📜 قائمة الفواكه:")
     for _, f in pairs(fruitLog) do
         print(f.Name.." | "..f.Time.." | TakenBy: "..f.TakenBy)
     end
 end)
 
-createButton("Exit Script (X)", 160, function()
-    running = false
+createButton("Exit Script (X)", 110, function()
+    scriptActive = false
     ScreenGui:Destroy()
-    print("🛑 تم إيقاف السكربت بنجاح.")
+    print("🛑 السكربت تم إيقافه.")
 end)
 
 -- Mini Map
@@ -118,7 +96,6 @@ local function createDot(fruit)
     return dot
 end
 
--- إشعار صوتي
 local function playDing()
     local sound = Instance.new("Sound", Workspace)
     sound.SoundId = "rbxassetid://7149516995"
@@ -129,7 +106,6 @@ end
 
 -- تحديث UI
 local function updateUI()
-    if not running then return end
     for fruit, arrow in pairs(fruitArrows) do
         if fruit and fruit.Parent and fruit:IsA("BasePart") then
             local fruitPos, onScreen = Camera:WorldToViewportPoint(fruit.Position)
@@ -152,8 +128,11 @@ local function updateUI()
             local y = math.clamp(0.5 + rel.Z,0,1)
             fruitDots[fruit].Position = UDim2.new(x,-3,y,-3)
 
-            if autoCollect and dist>10 then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(fruit.Position + Vector3.new(0,5,0))
+            if autoCollect and dist>5 then
+                -- تحريك بطيء آمن (بدون تحريك مباشر)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame:Lerp(
+                    CFrame.new(fruit.Position + Vector3.new(0,5,0)),0.1
+                )
             end
         else
             arrow:Destroy()
@@ -166,7 +145,6 @@ end
 
 -- فحص الفواكه
 local function scanFruits()
-    if not running then return end
     for _, obj in pairs(Workspace:GetChildren()) do
         if obj:IsA("Model") and string.find(obj.Name,"Fruit") then
             local part = obj:FindFirstChildWhichIsA("BasePart")
@@ -191,60 +169,47 @@ local function scanFruits()
     end
 end
 
--- كشف منو أخذ الفاكهة
-local function monitorPlayers()
-    for _, plr in pairs(Players:GetPlayers()) do
-        plr.CharacterAdded:Connect(function(char)
-            char.ChildAdded:Connect(function(tool)
-                if tool:IsA("Tool") and string.find(tool.Name,"Fruit") then
-                    for i,f in pairs(fruitLog) do
-                        if f.Name==tool.Name and f.TakenBy=="N/A" then
-                            f.TakenBy = plr.Name
-                            StarterGui:SetCore("SendNotification",{
-                                Title="Fruit Taken",
-                                Text=plr.Name.." أخذ "..tool.Name,
-                                Duration=5
-                            })
-                        end
+-- كشف من أخذ الفاكهة
+for _, plr in pairs(Players:GetPlayers()) do
+    plr.CharacterAdded:Connect(function(char)
+        char.ChildAdded:Connect(function(tool)
+            if tool:IsA("Tool") and string.find(tool.Name,"Fruit") then
+                for i,f in pairs(fruitLog) do
+                    if f.Name==tool.Name and f.TakenBy=="N/A" then
+                        f.TakenBy = plr.Name
+                        StarterGui:SetCore("SendNotification",{
+                            Title="Fruit Taken",
+                            Text=plr.Name.." أخذ "..tool.Name,
+                            Duration=5
+                        })
                     end
                 end
-            end)
+            end
         end)
-    end
+    end)
 end
 
-monitorPlayers()
-
--- تحديث مستمر
+-- التحديث المستمر
 RunService.RenderStepped:Connect(function()
-    if not running then return end
-    scanFruits()
-    updateUI()
+    if scriptActive then
+        scanFruits()
+        updateUI()
+    end
 end)
 
--- التحكم من الكيبورد
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe or not running then return end
-    if input.KeyCode == Enum.KeyCode.T then
-        -- Teleport closest fruit
-        local closest, dist = nil, math.huge
-        for fruit,_ in pairs(fruitArrows) do
-            if fruit and fruit.Parent then
-                local d = (LocalPlayer.Character.HumanoidRootPart.Position - fruit.Position).magnitude
-                if d < dist then
-                    closest = fruit
-                    dist = d
-                end
-            end
-        end
-        if closest then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(closest.Position + Vector3.new(0,5,0))
-        end
-    elseif input.KeyCode == Enum.KeyCode.Y then
+-- اختصارات لوحة المفاتيح
+UserInputService.InputBegan:Connect(function(input,gpe)
+    if gpe then return end
+    if input.KeyCode==Enum.KeyCode.Y then
         autoCollect = not autoCollect
-    elseif input.KeyCode == Enum.KeyCode.X then
-        running = false
+        StarterGui:SetCore("SendNotification",{
+            Title="Auto Collect",
+            Text=autoCollect and "✅ مفعل" or "❌ متوقف",
+            Duration=4
+        })
+    elseif input.KeyCode==Enum.KeyCode.X then
+        scriptActive = false
         ScreenGui:Destroy()
-        print("🛑 السكربت أُوقف بنجاح.")
+        print("🛑 السكربت تم إيقافه.")
     end
 end)
