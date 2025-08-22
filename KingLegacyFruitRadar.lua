@@ -1,4 +1,4 @@
--- King Legacy Fruit Radar + Auto-TP + Auto Collect + GUI + Logger
+-- King Legacy Fruit Radar Safe Version
 -- By: ITSH
 
 local Players = game:GetService("Players")
@@ -6,21 +6,17 @@ local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 local Debris = game:GetService("Debris")
 
--- بيانات الفواكه
 local fruitArrows, fruitDots, fruitLog = {}, {}, {}
-local autoCollect = false
-local miniMapVisible = true
 
 -- GUI رئيسي
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 
--- لوحة أوامر
+-- لوحة أوامر بسيطة
 local commandFrame = Instance.new("Frame", ScreenGui)
-commandFrame.Size = UDim2.new(0, 240, 0, 250)
+commandFrame.Size = UDim2.new(0, 220, 0, 120)
 commandFrame.Position = UDim2.new(0, 10, 0, 10)
 commandFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 commandFrame.BackgroundTransparency = 0.3
@@ -28,7 +24,7 @@ commandFrame.BorderSizePixel = 2
 
 local function createButton(text, posY, callback)
     local btn = Instance.new("TextButton", commandFrame)
-    btn.Size = UDim2.new(0, 220, 0, 40)
+    btn.Size = UDim2.new(0, 200, 0, 40)
     btn.Position = UDim2.new(0, 10, 0, posY)
     btn.Text = text
     btn.TextScaled = true
@@ -39,52 +35,11 @@ local function createButton(text, posY, callback)
     return btn
 end
 
--- أزرار التحكم
-createButton("Teleport Closest Fruit (T)", 10, function()
-    local closest, dist = nil, math.huge
-    for fruit,_ in pairs(fruitArrows) do
-        if fruit and fruit.Parent then
-            local d = (LocalPlayer.Character.HumanoidRootPart.Position - fruit.Position).magnitude
-            if d < dist then
-                closest = fruit
-                dist = d
-            end
-        end
-    end
-    if closest then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(closest.Position + Vector3.new(0,5,0))
-        StarterGui:SetCore("SendNotification", {
-            Title = "Fruit TP 🍏",
-            Text = "انتقلت إلى: "..closest.Parent.Name,
-            Duration = 4
-        })
-    end
-end)
-
-createButton("Toggle Auto Collect (Y)", 60, function()
-    autoCollect = not autoCollect
-    StarterGui:SetCore("SendNotification", {
-        Title = "Auto Collect",
-        Text = autoCollect and "✅ مفعل" or "❌ متوقف",
-        Duration = 4
-    })
-end)
-
-createButton("Toggle Mini Map", 110, function()
-    miniMapVisible = not miniMapVisible
-    miniMapFrame.Visible = miniMapVisible
-end)
-
-createButton("Show Fruit List (L)", 160, function()
+createButton("Show Fruit List (L)", 10, function()
     print("📜 قائمة الفواكه:")
     for _, f in pairs(fruitLog) do
         print(f.Name.." | "..f.Time.." | TakenBy: "..f.TakenBy)
     end
-end)
-
-createButton("Clear Fruit List", 210, function()
-    fruitLog = {}
-    print("🗑️ قائمة الفواكه تم مسحها")
 end)
 
 -- Mini Map
@@ -122,7 +77,6 @@ local function createDot(fruit)
     return dot
 end
 
--- إشعار صوتي
 local function playDing()
     local sound = Instance.new("Sound", Workspace)
     sound.SoundId = "rbxassetid://7149516995"
@@ -131,7 +85,6 @@ local function playDing()
     Debris:AddItem(sound, 3)
 end
 
--- تحديث UI
 local function updateUI()
     for fruit, arrow in pairs(fruitArrows) do
         if fruit and fruit.Parent and fruit:IsA("BasePart") then
@@ -154,10 +107,6 @@ local function updateUI()
             local x = math.clamp(0.5 + rel.X,0,1)
             local y = math.clamp(0.5 + rel.Z,0,1)
             fruitDots[fruit].Position = UDim2.new(x,-3,y,-3)
-
-            if autoCollect and dist>10 and fruitLog[f] ~= "Taken" then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(fruit.Position + Vector3.new(0,5,0))
-            end
         else
             arrow:Destroy()
             if fruitDots[fruit] then fruitDots[fruit]:Destroy() end
@@ -167,7 +116,6 @@ local function updateUI()
     end
 end
 
--- فحص الفواكه
 local function scanFruits()
     for _, obj in pairs(Workspace:GetChildren()) do
         if obj:IsA("Model") and string.find(obj.Name,"Fruit") then
@@ -198,13 +146,13 @@ RunService.RenderStepped:Connect(function()
     updateUI()
 end)
 
--- كشف من أخذ الفاكهة
-Players.PlayerAdded:Connect(function(plr)
+-- كشف من أخذ الفاكهة بدون تحريكك
+for _, plr in pairs(Players:GetPlayers()) do
     plr.CharacterAdded:Connect(function(char)
         char.ChildAdded:Connect(function(tool)
             if tool:IsA("Tool") and string.find(tool.Name,"Fruit") then
-                for _, f in pairs(fruitLog) do
-                    if f.Name == tool.Name and f.TakenBy=="N/A" then
+                for i,f in pairs(fruitLog) do
+                    if f.Name==tool.Name and f.TakenBy=="N/A" then
                         f.TakenBy = plr.Name
                         StarterGui:SetCore("SendNotification",{
                             Title="Fruit Taken",
@@ -216,4 +164,4 @@ Players.PlayerAdded:Connect(function(plr)
             end
         end)
     end)
-end)
+end
