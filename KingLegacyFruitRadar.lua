@@ -76,13 +76,8 @@ createButton("Show Fruit List (L)", 110, function()
     end
 end)
 
-createButton("Exit Script ❌", 160, function()
+createButton("Exit Script", 160, function()
     ScreenGui:Destroy()
-    fruitArrows = {}
-    fruitDots = {}
-    fruitLog = {}
-    autoCollect = false
-    print("Script exited successfully ✅")
 end)
 
 -- Mini Map
@@ -129,47 +124,16 @@ local function playDing()
     Debris:AddItem(sound, 3)
 end
 
--- تحديث UI
-local function updateUI()
-    for fruit, arrow in pairs(fruitArrows) do
-        if fruit and fruit.Parent and fruit:IsA("BasePart") then
-            local fruitPos, onScreen = Camera:WorldToViewportPoint(fruit.Position)
-            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - fruit.Position).magnitude
-
-            if onScreen then
-                arrow.Visible = true
-                arrow.Position = UDim2.new(0, fruitPos.X - 90, 0, fruitPos.Y - 20)
-                arrow.Text = "⬆ "..fruit.Parent.Name.." ["..math.floor(dist).."m]"
-                arrow.TextColor3 = Color3.fromRGB(0,255,0)
-            else
-                arrow.Visible = true
-                arrow.Position = UDim2.new(0.5, -90, 0.05, 0)
-                arrow.Text = "⬆ "..fruit.Parent.Name.." ("..math.floor(dist).."m)"
-                arrow.TextColor3 = Color3.fromRGB(255,0,0)
-            end
-
-            local rel = (fruit.Position - LocalPlayer.Character.HumanoidRootPart.Position)/200
-            local x = math.clamp(0.5 + rel.X,0,1)
-            local y = math.clamp(0.5 + rel.Z,0,1)
-            fruitDots[fruit].Position = UDim2.new(x,-3,y,-3)
-
-            if autoCollect and dist>10 then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(fruit.Position + Vector3.new(0,5,0))
-            end
-        else
-            arrow:Destroy()
-            if fruitDots[fruit] then fruitDots[fruit]:Destroy() end
-            fruitArrows[fruit]=nil
-            fruitDots[fruit]=nil
-        end
-    end
+-- إيجاد الجزء الرئيسي للفاكهة
+local function getFruitPart(fruitModel)
+    return fruitModel:FindFirstChildWhichIsA("BasePart") or fruitModel.PrimaryPart
 end
 
 -- فحص الفواكه
 local function scanFruits()
     for _, obj in pairs(Workspace:GetChildren()) do
         if obj:IsA("Model") and string.find(obj.Name,"Fruit") then
-            local part = obj:FindFirstChildWhichIsA("BasePart")
+            local part = getFruitPart(obj)
             if part and not fruitArrows[part] then
                 fruitArrows[part] = createArrow(part)
                 fruitDots[part] = createDot(part)
@@ -191,12 +155,35 @@ local function scanFruits()
     end
 end
 
-RunService.RenderStepped:Connect(function()
-    scanFruits()
-    updateUI()
-end)
+-- تحديث MiniMap والنقاط وAuto Collect
+local function updateUI()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrpPos = LocalPlayer.Character.HumanoidRootPart.Position
 
--- كشف منو أخذ الفاكهة
+    for fruit, arrow in pairs(fruitArrows) do
+        if fruit and fruit.Parent and fruit:IsA("BasePart") then
+            local fruitPos, onScreen = Camera:WorldToViewportPoint(fruit.Position)
+            local dist = (hrpPos - fruit.Position).magnitude
+
+            arrow.Text = "⬆ "..fruit.Parent.Name.." ["..math.floor(dist).."m]"
+
+            local x = math.clamp(0.5 + (fruit.Position.X - hrpPos.X)/200, 0, 1)
+            local y = math.clamp(0.5 + (fruit.Position.Z - hrpPos.Z)/200, 0, 1)
+            fruitDots[fruit].Position = UDim2.new(x,-3,y,-3)
+
+            if autoCollect and dist>10 then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(fruit.Position + Vector3.new(0,5,0))
+            end
+        else
+            arrow:Destroy()
+            if fruitDots[fruit] then fruitDots[fruit]:Destroy() end
+            fruitArrows[fruit]=nil
+            fruitDots[fruit]=nil
+        end
+    end
+end
+
+-- كشف من أخذ الفاكهة
 for _, plr in pairs(Players:GetPlayers()) do
     plr.CharacterAdded:Connect(function(char)
         char.ChildAdded:Connect(function(tool)
@@ -215,3 +202,8 @@ for _, plr in pairs(Players:GetPlayers()) do
         end)
     end)
 end
+
+RunService.RenderStepped:Connect(function()
+    scanFruits()
+    updateUI()
+end)
